@@ -42,6 +42,17 @@ app.use('/api/auth', routes.auth);
 app.use('/api/polls', routes.poll);
 app.use('/api/civic', require('./routes/civic'));
 
+// Serve the production frontend from the same origin as the API.
+if (process.env.NODE_ENV === 'production') {
+  const path = require('path');
+  const frontend = path.join(__dirname, '../client/dist');
+  app.use(express.static(frontend));
+  app.get('*', (req, res, next) => {
+    if (req.path === '/api' || req.path.startsWith('/api/')) return next();
+    res.sendFile(path.join(frontend, 'index.html'));
+  });
+}
+
 app.use((req, res, next) => {
   let err = new Error('Not Found');
   err.status = 404;
@@ -49,4 +60,5 @@ app.use((req, res, next) => {
 });
 app.use(handle.error);
 
-app.listen(PORT, '127.0.0.1', () => console.log(`Server listening on port ${PORT}`));
+const HOST = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
+app.listen(PORT, HOST, () => console.log(`Server listening on port ${PORT}`));
