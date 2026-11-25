@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const host = 'http://localhost:4000/api';
+const host = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 
 export const setToken = token => {
   if (token) {

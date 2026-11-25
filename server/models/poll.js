@@ -19,6 +19,11 @@ const pollSchema = new mongoose.Schema({
     default: Date.now,
   },
   question: String,
+  description: String,
+  category: String,
+  action: String,
+  archived: { type: Boolean, default: false },
+  seedKey: String,
   options: [optionSchema],
   voted: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 });

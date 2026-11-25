@@ -17,7 +17,9 @@ exports.getUsers = async (req, res, next) => {
 
 exports.register = async (req, res, next) => {
   try {
-    const user = await db.User.create(req.body);
+    const { username: requestedUsername, password } = req.body;
+    if (typeof requestedUsername !== 'string' || requestedUsername.trim().length < 3 || requestedUsername.length > 40 || typeof password !== 'string' || password.length < 8 || password.length > 128) throw new Error('Use a 3–40 character username and an 8–128 character password.');
+    const user = await db.User.create({ username: requestedUsername.trim(), password });
     const { id, username } = user;
     const token = jwt.sign({ id, username }, process.env.SECRET);
 

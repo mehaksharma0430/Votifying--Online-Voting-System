@@ -2,7 +2,7 @@ const db = require('../models');
 
 exports.showPolls = async (req, res, next) => {
   try {
-    const polls = await db.Poll.find().populate('user', ['username', 'id']);
+    const polls = await db.Poll.find({ archived: { $ne: true } }).populate('user', ['username', 'id']);
     // .populate('voted', ['username', 'id']);
 
     return res.status(200).json(polls);
@@ -30,13 +30,17 @@ exports.usersPolls = async (req, res, next) => {
 
 exports.createPoll = async (req, res, next) => {
   const { id } = req.decoded;
-  const { question, options } = req.body;
+  const { question, options, description, category, action } = req.body;
   try {
+    if (typeof question !== 'string' || !question.trim() || question.length > 180 || !Array.isArray(options) || options.length < 2 || options.length > 6 || options.some(o => typeof o !== 'string' || !o.trim() || o.length > 160) || new Set(options.map(o => o.trim().toLowerCase())).size !== options.length) throw new Error('Provide a question and 2–6 distinct, non-empty options.');
+    if (description && (typeof description !== 'string' || description.length > 1000)) throw new Error('Description must be under 1000 characters.');
+    if (action && (typeof action !== 'string' || action.length > 600)) throw new Error('Next step must be under 600 characters.');
     const user = await db.User.findById(id);
     const poll = await db.Poll.create({
-      question,
+      question: question.trim(),
+      description, category, action,
       user,
-      options: options.map(option => ({ option, votes: 0 })),
+      options: options.map(option => ({ option: option.trim(), votes: 0 })),
     });
     user.polls.push(poll._id);
     await user.save();
@@ -51,50 +55,17 @@ exports.createPoll = async (req, res, next) => {
 };
 
 exports.vote = async (req, res, next) => {
-  const { id: pollId } = req.params;
-  const { id: userId } = req.decoded;
-  const { answer } = req.body;
   try {
-    if (answer) {
-      const poll = await db.Poll.findById(pollId);
-      if (!poll) throw new Error('No poll found');
-
-      const vote = poll.options.map(
-        option =>
-          option.option === answer
-            ? {
-                option: option.option,
-                _id: option._id,
-                votes: option.votes + 1,
-              }
-            : option,
-      );
-
-      console.log('VOTE: USERID ', userId);
-      console.log('VOTE: poll.voted ', poll.voted);
-      console.log(
-        'VOTE: vote filter',
-        poll.voted.filter(user => user.toString() === userId).length,
-      );
-
-      if (poll.voted.filter(user => user.toString() === userId).length <= 0) {
-        poll.voted.push(userId);
-        poll.options = vote;
-        await poll.save();
-
-        return res.status(202).json(poll);
-      } else {
-        throw new Error('Already voted');
-      }
-    } else {
-      throw new Error('No Answer Provided');
-    }
-  } catch (err) {
-    return next({
-      status: 400,
-      message: err.message,
-    });
-  }
+    const { answer } = req.body;
+    if (typeof answer !== 'string' || !answer.trim()) throw new Error('Choose an option to vote.');
+    const poll = await db.Poll.findOneAndUpdate(
+      { _id: req.params.id, archived: { $ne: true }, voted: { $ne: req.decoded.id }, 'options.option': answer },
+      { $inc: { 'options.$.votes': 1 }, $addToSet: { voted: req.decoded.id } },
+      { new: true, useFindAndModify: false }
+    );
+    if (!poll) throw new Error('Vote not accepted: you may have already voted, or this option is unavailable.');
+    return res.status(202).json(poll);
+  } catch (err) { return next({ status: 400, message: err.message }); }
 };
 
 exports.getPoll = async (req, res, next) => {

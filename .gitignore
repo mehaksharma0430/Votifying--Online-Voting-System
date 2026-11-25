@@ -101,3 +101,10 @@ typings/
 # End of https://www.gitignore.io/api/node,macos,visualstudiocode
 yarn.lock
 package-lock.json
+.npm-cache/
+
+# Local credentials, generated output, and machine-specific notes
+.env.*
+!.env.example
+dist/
+LOCAL-SETUP.md
